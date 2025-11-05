@@ -1,65 +1,126 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { wrapFetchWithPayment, decodeXPaymentResponse } from "x402-fetch";
+import { createWalletClient, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { baseSepolia } from "viem/chains";
+
+// --- Setup wallet directly here (simple version) ---
+const PRIVATE_KEY = process.env.NEXT_PUBLIC_PRIVATE_KEY;
+const account = privateKeyToAccount(PRIVATE_KEY);
+const walletClient = createWalletClient({
+  account,
+  chain: baseSepolia,
+  transport: http(),
+});
+
+// --- Main component ---
+export default function HomePage() {
+  const [response, setResponse] = useState(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [price, setPrice] = useState(null);
+
+  async function callProtectedAPI() {
+    try {
+      setLoading(true);
+      setResponse(null);
+
+      // Simple fetch to see if paywall triggers
+      const res = await fetch("/api/protected");
+      if (res.status === 402) {
+        const data = await res.json();
+        // Optional: parse price dynamically from response
+        const priceText = data?.price || "$0.01";
+        setPrice(priceText);
+        setShowPaywall(true);
+        return;
+      }
+
+      // No payment needed, show result
+      const data = await res.json();
+      setResponse(JSON.stringify(data, null, 2));
+    } catch (err) {
+      console.error(err);
+      setResponse(err?.message || "Error making request");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function payAndRetry() {
+    try {
+      setLoading(true);
+      setShowPaywall(false);
+      setResponse("Processing payment...");
+
+      const fetchWithPayment = wrapFetchWithPayment(fetch, account);
+      const res = await fetchWithPayment("/api/protected", { method: "GET" });
+      const data = await res.json();
+
+      const header = res.headers.get("x-payment-response");
+      if (header) {
+        const paymentResponse = decodeXPaymentResponse(header);
+        console.log("Payment Info:", paymentResponse);
+      }
+
+      setResponse(JSON.stringify(data, null, 2));
+    } catch (err) {
+      console.error(err);
+      setResponse("Payment or request failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="flex flex-col items-center justify-center min-h-screen text-center space-y-6 p-6 relative">
+      <h1 className="text-3xl font-bold">x402 Buyer Demo (Next.js)</h1>
+      <p className="text-gray-600 max-w-md">
+        Demonstrates how to unlock a paywalled API route using <code>viem</code>{" "}
+        + <code>x402-fetch</code>.
+      </p>
+
+      <button
+        onClick={callProtectedAPI}
+        disabled={loading}
+        className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+      >
+        {loading ? "Loading..." : "Call Paid API"}
+      </button>
+
+      {response && (
+        <pre className="bg-gray-100 text-left text-sm p-4 rounded-lg max-w-2xl overflow-auto">
+          {response}
+        </pre>
+      )}
+
+      {showPaywall && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+          <div className="bg-white p-6 rounded-xl shadow-lg w-80 text-center space-y-4">
+            <h2 className="text-xl font-semibold">🔒 Payment Required</h2>
+            <p className="text-gray-600">
+              This API requires a payment of{" "}
+              <span className="font-semibold">{price || "$0.01"}</span>.
+            </p>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => setShowPaywall(false)}
+                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={payAndRetry}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Pay & Unlock
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      )}
+    </main>
   );
 }
