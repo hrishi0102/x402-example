@@ -7,7 +7,7 @@ export const middleware = paymentMiddleware(
   payTo,
   {
     "/api/protected": {
-      price: "$0.01",
+      price: "$0.001",
       network: "base-sepolia",
       config: {
         description: "Access to protected content",
@@ -18,7 +18,7 @@ export const middleware = paymentMiddleware(
     url: "https://x402.org/facilitator",
   },
   {
-    appName: "Next x402 Demo",
+    appName: "x402 Demo",
     appLogo: "/x402-icon-blue.png",
   }
 );
