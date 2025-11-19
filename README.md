@@ -77,6 +77,83 @@ The payment middleware is configured in `middleware.js`:
 - **Price**: $0.001 per API call
 - **Facilitator**: x402.org facilitator service for testnet
 
+### Adding More Protected API Routes
+
+To add additional paywalled API endpoints, update the `middleware.js` file:
+
+1. **Add the route to the routes object:**
+
+```javascript
+export const middleware = paymentMiddleware(
+  payTo,
+  {
+    "/api/protected": {
+      price: "$0.001",
+      network: "base-sepolia",
+      config: {
+        description: "Access to protected content",
+      },
+    },
+    // Add your new route here
+    "/api/premium": {
+      price: "$0.01",
+      network: "base-sepolia",
+      config: {
+        description: "Premium API access",
+      },
+    },
+    "/api/data": {
+      price: "$0.005",
+      network: "base-sepolia",
+      config: {
+        description: "Data API endpoint",
+      },
+    },
+  }
+  // ... rest of config
+);
+```
+
+2. **Update the matcher to include the new routes:**
+
+```javascript
+export const config = {
+  matcher: [
+    "/api/protected/:path*",
+    "/api/premium/:path*", // Add new route pattern
+    "/api/data/:path*", // Add new route pattern
+  ],
+};
+```
+
+**Route Configuration Options:**
+
+- `price` - The payment amount (e.g., `"$0.001"`, `"$0.01"`)
+- `network` - The blockchain network (e.g., `"base-sepolia"`, `"base"`)
+- `config.description` - Human-readable description shown in payment UI
+
+**Example: Different prices for different endpoints**
+
+```javascript
+{
+  "/api/basic": {
+    price: "$0.001",
+    network: "base-sepolia",
+    config: { description: "Basic API access" },
+  },
+  "/api/pro": {
+    price: "$0.01",
+    network: "base-sepolia",
+    config: { description: "Pro API access" },
+  },
+  "/api/enterprise": {
+    price: "$0.1",
+    network: "base-sepolia",
+    config: { description: "Enterprise API access" },
+  },
+}
+```
+
 ## Learn More
 
 - [x402 Protocol](https://x402.org)
