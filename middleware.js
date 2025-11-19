@@ -1,5 +1,4 @@
-import { Address } from "viem";
-import { paymentMiddleware, Network, Resource } from "x402-next";
+import { paymentMiddleware } from "x402-next";
 
 const payTo = "0x6a475ed41c9a172332dba2308e5d6d059f650e12";
 
